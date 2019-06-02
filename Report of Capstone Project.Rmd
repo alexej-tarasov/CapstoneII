@@ -34,12 +34,18 @@ library(tidyverse)
 library(lubridate)
 library(broom)
 library(ggplot2)
+library(RCurl)
+library(kableExtra)
+library(e1071)
 ```
 
 The data will be read 
 ```{r}
 data<-read.csv("~/CapstoneII/CapstoneII/adult.csv")
-
+#library(httr)
+#nuts <-read.csv(text=GET("https://raw.githubusercontent.com/alexej-tarasov/CapstoneII/adult.csv"), header=T)
+#x <- read.csv("https://github.com/alexej-tarasov/CapstoneII/adult.csv")
+#data2 <- read.csv(text = x)
 ```
 The data has following attributes
 
@@ -72,6 +78,44 @@ The data has following attributes
 **hours-per-week**: continuous
 
 **native-country**: United-States, Cambodia, England, Puerto-Rico, Canada, Germany, Outlying-US(Guam-USVI-etc), India, Japan, Greece, South, China, Cuba, Iran, Honduras, Philippines, Italy, Poland, Jamaica, Vietnam, Mexico, Portugal, Ireland, France, Dominican-Republic, Laos, Ecuador, Taiwan, Haiti, Columbia, Hungary, Guatemala, Nicaragua, Scotland, Thailand, Yugoslavia, El-Salvador, Trinadad&Tobago, Peru, Hong, Holand-Netherlands
+
+
+Below the example of the top10 rows is shown
+```{r}
+as_tibble(head(data,n=10))%>%kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+
+The data is separated to the test and validation set using the caret package.
+Validation set will be 10 % percent of the total records in adult.csv
+```{r}
+set.seed(1)
+test_index <- createDataPartition(y = data$income, times = 1, p = 0.1, list = FALSE)
+trainset <- data[-test_index,]
+temp <- data[test_index,]
+validation <- temp %>% 
+     semi_join(trainset, by = "workclass") %>%
+     semi_join(trainset, by = "education") %>%
+     semi_join(trainset, by = "marital.status") %>%
+     semi_join(trainset, by = "occupation") %>%
+     semi_join(trainset, by = "relationship")%>%
+     semi_join(trainset, by = "native.country")
+
+
+```
+
+```{r}
+print(paste("Trainset has ",count(trainset)," records"))
+print(paste("Validation set has ",count(validation)," records"))
+
+```
+```{r}
+y<-train(income~.,data = trainset)
+y
+
+```
+
 
 # Results section
 # Conclusion section.

@@ -101,14 +101,11 @@ validation <- temp %>%
      semi_join(trainset, by = "occupation") %>%
      semi_join(trainset, by = "relationship")%>%
      semi_join(trainset, by = "native.country")
-
-
 ```
 
 ```{r}
 print(paste("Trainset has ",count(trainset)," records"))
 print(paste("Validation set has ",count(validation)," records"))
-
 ```
 ```{r}
 y<-train(income~.,data = trainset)

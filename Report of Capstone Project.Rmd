@@ -37,9 +37,13 @@ library(ggplot2)
 library(RCurl)
 library(kableExtra)
 library(e1071)
+library(parallel)
+library(doParallel)
+library(rpart)
+library(Rborist)
 ```
 
-The data will be read 
+In this section data will be read
 ```{r}
 data<-read.csv("~/CapstoneII/CapstoneII/adult.csv")
 #library(httr)
@@ -101,18 +105,141 @@ validation <- temp %>%
      semi_join(trainset, by = "occupation") %>%
      semi_join(trainset, by = "relationship")%>%
      semi_join(trainset, by = "native.country")
+accuracy_results<-data.frame()
 ```
 
 ```{r}
 print(paste("Trainset has ",count(trainset)," records"))
 print(paste("Validation set has ",count(validation)," records"))
 ```
-```{r}
-y<-train(income~.,data = trainset)
-y
 
+
+
+Check the importance of the variables
+```{r}
+model1<-rpart(income~.,data = trainset)
+var1<-varImp(model1) # Calculation of iimportance
+var1<-rownames_to_column(var1) # Transfer of the row names to the separate column in data frame
+varImpotance<-var1[order(-var1$Overall),] # Reorder of the importances by value
+ggplot(varImpotance,aes(x = reorder(rowname, Overall),y=Overall),fill = variable)+ #chart creation
+  geom_bar(stat = "identity",fill="black")+
+  xlab("Features")+ylab("Overall importance")+ggtitle("Features importance in dataset")+
+  theme_minimal()+ theme(axis.text.x = element_text(angle = 90, hjust = 1))+coord_flip()
+```
+Features workclass,sex, race, native.country,hours.per.week,age and fnlwgt has no significant importance to the prediction in and these features will be excluded from the analysis
+```{r}
+trainset_opt<-trainset%>%select(-workclass,-sex, -race, -native.country,-fnlwgt,-hours.per.week,-age)
+as_tibble(trainset_opt)
 ```
 
+Below first try is to use random forest algoriithm with parallel processing with parameter selection
+Duration of theh process with 7 parallel cores is ca 10 minutes
+```{r}
+tsCVstart<-Sys.time()
+print(paste("Process started",tsCVstart))
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)  # registration of the clusters for parallel processing
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE) # adjusting control for allowing parrallel processing
+y<-train(income~., method="rf",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
+y # display of the model
+ggplot(y,highlight = T)
+prediction_rf<-predict(y,validation)
+confusionMatrix(data=prediction_rf,reference=validation$income)
+stopCluster(cluster)
+registerDoSEQ()
+rf_accuracy<-confusionMatrix(data=prediction_rf,reference=validation$income)$overall[["Accuracy"]]
 
+accuracy_results <- bind_rows(accuracy_results,
+                          data_frame(method="rf",  
+                                     Accuracy = rf_accuracy))
+print(accuracy_results)
+tsCVfinish<-Sys.time()
+print(paste("Process finished ",tsCVfinish))
+print(paste("Process duration ",trunc(unclass(tsCVfinish)-unclass(tsCVstart)),"sec"))
+```
+
+Training model with rborist
+```{r}
+tsCVstart<-Sys.time()
+print(paste("Process started",tsCVstart))
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)  # registration of the clusters for parallel processing
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE) # adjusting control for allowing parrallel processing
+y<-train(income~., method="xgbDART",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
+y # display of the model
+#ggplot(y,highlight = T)
+prediction_rf<-predict(y,validation)
+confusionMatrix(data=prediction_rf,reference=validation$income)
+stopCluster(cluster)
+registerDoSEQ()
+rf_accuracy<-confusionMatrix(data=prediction_rf,reference=validation$income)$overall[["Accuracy"]]
+
+accuracy_results <- bind_rows(accuracy_results,
+                          data_frame(method="xgBoost",  
+                                     Accuracy = rf_accuracy))
+print(accuracy_results)
+tsCVfinish<-Sys.time()
+print(paste("Process finished ",tsCVfinish))
+print(paste("Process duration ",trunc(unclass(tsCVfinish)-unclass(tsCVstart)),"sec"))
+```
+Training model with gbm
+```{r}
+tsCVstart<-Sys.time()
+print(paste("Process started",tsCVstart))
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)  # registration of the clusters for parallel processing
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE) # adjusting control for allowing parrallel processing
+y<-train(income~., method="gbm",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
+y # display of the model
+#ggplot(y,highlight = T)
+prediction_rf<-predict(y,validation)
+confusionMatrix(data=prediction_rf,reference=validation$income)
+stopCluster(cluster)
+registerDoSEQ()
+rf_accuracy<-confusionMatrix(data=prediction_rf,reference=validation$income)$overall[["Accuracy"]]
+
+accuracy_results <- bind_rows(accuracy_results,
+                          data_frame(method="GBM ",  
+                                     Accuracy = rf_accuracy))
+print(accuracy_results)
+tsCVfinish<-Sys.time()
+print(paste("Process finished ",tsCVfinish))
+print(paste("Process duration ",trunc(unclass(tsCVfinish)-unclass(tsCVstart)),"sec"))
+```
+Training model with lvq
+```{r}
+tsCVstart<-Sys.time()
+print(paste("Process started",tsCVstart))
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)  # registration of the clusters for parallel processing
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE) # adjusting control for allowing parrallel processing
+y<-train(income~., method="lvq",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
+y # display of the model
+#ggplot(y,highlight = T)
+prediction_rf<-predict(y,validation)
+confusionMatrix(data=prediction_rf,reference=validation$income)
+stopCluster(cluster)
+registerDoSEQ()
+rf_accuracy<-confusionMatrix(data=prediction_rf,reference=validation$income)$overall[["Accuracy"]]
+
+accuracy_results <- bind_rows(accuracy_results,
+                          data_frame(method="lvq",  
+                                     Accuracy = rf_accuracy))
+print(accuracy_results)
+tsCVfinish<-Sys.time()
+print(paste("Process finished ",tsCVfinish))
+print(paste("Process duration ",trunc(unclass(tsCVfinish)-unclass(tsCVstart)),"sec"))
+```
 # Results section
+After evaluation of the methods rf, rborist, lvq and GBM, the best model was selected. 
+The best model is...
+The selection was made based on the Accuracy
 # Conclusion section.

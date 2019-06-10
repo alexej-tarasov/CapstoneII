@@ -18,7 +18,10 @@ https://github.com/alexej-tarasov/CapstoneII file adult.csv
 # Overview
 
 The target cell is the column which predicts whether the person has incomes more or less then 50K USD annually.
-In this paper the data first will be shared to test and validation data,second the features will be evaluated based on its importance, third different models will be used to predict the values and in the end the best model will be selected based on accuaracy. The package "caret" of the language R is used for making prediction
+In this paper the data first will be shared to test and validation data,
+second the features will be evaluated based on its importance, 
+third different models will be used to predict the values and 
+in the end the best model will be selected based on accuaracy. The package "caret" of the language R is used for making prediction.
 
 
 
@@ -42,15 +45,17 @@ library(doParallel)
 library(rpart)
 library(caTools)
 library(Rborist)
+library(randomForest)
+library(gbm)
 ```
 
 In this section data will be read
+If you have any problem with the download of this dataset please download it from my github
+https://github.com/alexej-tarasov/CapstoneII
 ```{r}
-data<-read.csv("~/CapstoneII/CapstoneII/adult.csv")
-#library(httr)
-#nuts <-read.csv(text=GET("https://raw.githubusercontent.com/alexej-tarasov/CapstoneII/adult.csv"), header=T)
-#x <- read.csv("https://github.com/alexej-tarasov/CapstoneII/adult.csv")
-#data2 <- read.csv(text = x)
+#data<-read.csv("~/CapstoneII/CapstoneII/adult.csv") 
+data <- read.csv("https://raw.githubusercontent.com/alexej-tarasov/CapstoneII/master/adult.csv")# please see comments above if you have any problem with download
+
 ```
 The data has following attributes
 
@@ -131,7 +136,7 @@ ggplot(varImpotance,aes(x = reorder(rowname, Overall),y=Overall),fill = variable
 Features workclass,sex, race, native.country,hours.per.week,age and fnlwgt has no significant importance to the prediction in and these features will be excluded from the analysis and save new feature optimised dataset as "trainset_opt"
 ```{r}
 trainset_opt<-trainset%>%select(-workclass,-sex, -race, -native.country,-fnlwgt,-hours.per.week,-age)
-as_tibble(trainset_opt)%>%kable() %>%
+as_tibble(trainset_opt)%>%head(n=10)%>%kable() %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 ```
 
@@ -150,7 +155,7 @@ fitControl <- trainControl(method = "cv",
 set.seed(1)
 model_rf<-train(income~., method="rf",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
 #model_rf # display of the model
-ggplot(model_rf,highlight = T)
+ggplot(model_rf,highlight = T) # result of optimisation
 prediction_rf<-predict(model_rf,validation)
 #confusionMatrix(data=prediction_rf,reference=validation$income)
 stopCluster(cluster)
@@ -165,12 +170,12 @@ tsCVfinish<-Sys.time()
 #print(paste("Process finished ",tsCVfinish))
 print(paste("Process duration ",trunc(unclass(tsCVfinish)-unclass(tsCVstart)),"sec"))
 ```
-Second model for the training was selected xgbTree method from caret package
+Second model for the training was selected xgbTree method from caret package.
 Method xgbTree is one of the methods of xgBoosting and is supposed for classification
 ```{r}
 getModelInfo()$xgbTree$type
 ```
-
+Calculation will take approximately 2 minutes with 7 cores
 ```{r}
 tsCVstart<-Sys.time()
 #print(paste("Process started",tsCVstart))
@@ -202,7 +207,7 @@ Method xgbDART is XGBoost method and is supposed for classification
 ```{r}
 getModelInfo()$xgbDART$type
 ```
-
+Calculation will take approximately 16 minutes with 7 cores 
 ```{r}
 tsCVstart<-Sys.time()
 #print(paste("Process started",tsCVstart))
@@ -237,7 +242,7 @@ Method glm is logistic regression model and is supposed for classification
 ```{r}
 getModelInfo()$glm$type
 ```
-
+Calculation will take approximately 0.5 minutes with 7 cores 
 ```{r}
 tsCVstart<-Sys.time()
 #print(paste("Process started",tsCVstart))
@@ -247,7 +252,7 @@ fitControl <- trainControl(method = "cv",
                            number = 5,
                            allowParallel = TRUE) # adjusting control for allowing parrallel processing
 set.seed(1)
-#model_glm<-train(income~., method="glm",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
+model_glm<-train(income~., method="glm",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
 #model_glm # display of the model
 #ggplot(model_glm,highlight = T)
 prediction_glm<-predict(model_glm,validation)
@@ -257,7 +262,7 @@ registerDoSEQ()
 accuracy_glm<-confusionMatrix(data=prediction_glm,reference=validation$income)$overall[["Accuracy"]]
 
 accuracy_results <- bind_rows(accuracy_results,
-                          data_frame(method="glm ",  
+                          data_frame(method="glm",  
                                      Accuracy = accuracy_glm))
 print(accuracy_results)
 tsCVfinish<-Sys.time()
@@ -270,8 +275,8 @@ Method gbm is Generalized Boosted Regression Modeling (GBM) and is supposed for 
 ```{r}
 getModelInfo()$gbm$type
 ```
-
-```{r}
+Calculation will take approximately 1 minutes with 7 cores 
+```{r warning=FALSE}
 tsCVstart<-Sys.time()
 #print(paste("Process started",tsCVstart))
 cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
@@ -280,9 +285,9 @@ fitControl <- trainControl(method = "cv",
                            number = 5,
                            allowParallel = TRUE) # adjusting control for allowing parrallel processing
 set.seed(1)
-#model_gbm<-train(income~., method="gbm",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
+model_gbm<-train(income~., method="gbm",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
 #model_gbm # display of the model
-ggplot(model_gbm,highlight = T)
+#ggplot(model_gbm,highlight = T)
 prediction_gbm<-predict(model_gbm,validation)
 #confusionMatrix(data=prediction_gbm,reference=validation$income)
 stopCluster(cluster)
@@ -313,7 +318,7 @@ fitControl <- trainControl(method = "cv",
                            number = 5,
                            allowParallel = TRUE) # adjusting control for allowing parrallel processing
 set.seed(1)
-#model_LogitBoost<-train(income~., method="LogitBoost",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
+model_LogitBoost<-train(income~., method="LogitBoost",data = trainset_opt,trControl = fitControl) # creation of the model for all attributes, take a lot of time 
 #model_LogitBoost # display of the model
 ggplot(model_LogitBoost,highlight = T)
 prediction_LogitBoost<-predict(model_LogitBoost,validation)
@@ -325,8 +330,7 @@ accuracy_LogitBoost<-confusionMatrix(data=prediction_rf,reference=validation$inc
 accuracy_results <- bind_rows(accuracy_results,
                           data_frame(method="LogitBoost ",  
                                      Accuracy = accuracy_LogitBoost))
-print(accuracy_results)%>%kable() %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
 tsCVfinish<-Sys.time()
 #print(paste("Process finished ",tsCVfinish))
 print(paste("Process duration ",trunc(unclass(tsCVfinish)-unclass(tsCVstart)),"sec"))
@@ -335,6 +339,11 @@ print(paste("Process duration ",trunc(unclass(tsCVfinish)-unclass(tsCVstart)),"s
 After evaluation of the methods rf, xgbTree, xgbDART,glm,LogitBoost and GBM the best model was selected. 
 The best model is xgbDart with the accuracy of 0.873. xgbDART is extreme Gradient boosting algorithm.alo
 All other used algorithm delivered also high accuracy which is  comparable to xgbDart and lies in the range of 0.85-0.86
+```{r}
+print(accuracy_results)%>%kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
 
 # Conclusion section.
 We have used publically available dataset *Adult Census Income* to create the best prediction model. Data was separated into train and validation set. Features(Dimenstions) were analysed and seven of them were deleted due to the slow significance. 
